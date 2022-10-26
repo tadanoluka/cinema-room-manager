@@ -32,9 +32,31 @@ class CinemaManager {
         }
 
     }
+
+    fun calculateExpectedIncomeForRoom (rows: Int, columns: Int) {
+        val numberOfSeats = rows * columns
+        val expectedIncome: Int
+        val defaultPrice = 10
+        val defaultBackPrice = 8
+        expectedIncome = if (numberOfSeats <= 60) {
+            numberOfSeats * defaultPrice
+        } else {
+            val firstHalfOfRoomIncome = rows / 2 * columns * defaultPrice
+            val secondHalfOfRoomIncome = (rows / 2 + rows % 2) * columns * defaultBackPrice
+            firstHalfOfRoomIncome + secondHalfOfRoomIncome
+        }
+        println("Total income:")
+        println("\$$expectedIncome")
+    }
 }
 
 fun main() {
     val cinemaManager = CinemaManager()
-    cinemaManager.printGrid()
+    // cinemaManager.printGrid()
+
+    println("Enter the number of rows:")
+    val rows = readln().toInt()
+    println("Enter the number of seats in each row:")
+    val columns = readln().toInt()
+    cinemaManager.calculateExpectedIncomeForRoom(rows, columns)
 }
