@@ -1,15 +1,27 @@
 package cinema
 
 class CinemaRoom(_rows: Int, _columns: Int) {
-    val rows = if (_rows <= 9) _rows else 0
-    val columns = if (_columns <= 9) _columns else 0
-    val grid = mutableListOf(mutableListOf<String>())
+    var rows = if (_rows <= 9) _rows else 0
+        set(value) {
+            field = if (value <= 9) value else 0
+            makeGrid()
+            numberOfSeats = rows * columns
+            isALargeRoom = numberOfSeats > 60
+        }
+    var columns = if (_columns <= 9) _columns else 0
+        set(value) {
+            field = if (value <= 9) value else 0
+            makeGrid()
+            numberOfSeats = rows * columns
+            isALargeRoom = numberOfSeats > 60
+        }
+    private var grid = mutableListOf(mutableListOf<String>())
 
-    val defaultPrice = 10
-    val defaultBackPrice = 8
+    private val defaultPrice = 10
+    private val defaultBackPrice = 8
 
-    val numberOfSeats: Int
-    val isALargeRoom: Boolean
+    private var numberOfSeats: Int
+    private var isALargeRoom: Boolean
 
     init {
         makeGrid()
@@ -18,22 +30,23 @@ class CinemaRoom(_rows: Int, _columns: Int) {
     }
 
     private fun makeGrid() {
-        val firstRow = mutableListOf<String>(" ")
+        grid = mutableListOf()
+        val firstRow = mutableListOf(" ")
         for (i in 1..columns ) {
             firstRow.add(i.toString())
         }
         grid.add(firstRow)
         for (i in 1..rows) {
-            val rowList = mutableListOf<String>(i.toString())
+            val rowList = mutableListOf(i.toString())
             repeat (columns) {
                 rowList.add("S")
             }
             grid.add(rowList)
         }
-        grid.removeAt(0)
     }
 
     fun printGrid() {
+        println()
         println("Cinema:")
         for (i in 0..rows) {
             println(grid[i].joinToString(" "))
@@ -57,59 +70,101 @@ class CinemaRoom(_rows: Int, _columns: Int) {
 }
 
 class CinemaManager {
-    val cinemaRooms: MutableList<CinemaRoom> = mutableListOf()
-    var currentRoom: CinemaRoom
+    private val cinemaRooms: MutableList<CinemaRoom> = mutableListOf()
+    private var currentRoom: CinemaRoom
+
+    private var currentState: CinemaManagerState
+
+    private var chosenRow = 0
+    private var chosenSeat = 0
 
     init {
+        currentState = CinemaManagerState.EDITING_ROOM_ROWS
+
+        cinemaRooms.add(CinemaRoom(0, 0))
         currentRoom = if (cinemaRooms.isNotEmpty()) {
             cinemaRooms[0]
         } else CinemaRoom(0,0)
+
+        println("Enter the number of rows:")
     }
 
-    fun addCinemaRoom(rows: Int, columns: Int) {
-        cinemaRooms.add(CinemaRoom(rows, columns))
-        currentRoom = cinemaRooms[0]
+    enum class CinemaManagerState {
+        EDITING_ROOM_ROWS, EDITING_ROOM_SEATS, CHOOSING_ACTION, BUYING_TICKET_CHOOSING_ROW, BUYING_TICKET_CHOOSING_SEAT
     }
 
-    fun calculateExpectedIncomeForRoom (rows: Int, columns: Int) {
-        val numberOfSeats = rows * columns
-        val expectedIncome: Int
-        val defaultPrice = 10
-        val defaultBackPrice = 8
-        expectedIncome = if (numberOfSeats <= 60) {
-            numberOfSeats * defaultPrice
-        } else {
-            val firstHalfOfRoomIncome = rows / 2 * columns * defaultPrice
-            val secondHalfOfRoomIncome = (rows / 2 + rows % 2) * columns * defaultBackPrice
-            firstHalfOfRoomIncome + secondHalfOfRoomIncome
+    fun inputInterface(inputString: String){
+        when (currentState) {
+            CinemaManagerState.CHOOSING_ACTION -> {
+                when(inputString.lowercase()) {
+                    "1" -> {
+                        currentRoom.printGrid()
+                        printMenu()
+                    }
+                    "2" -> {
+                        println("\nEnter a row number:")
+                        currentState = CinemaManagerState.BUYING_TICKET_CHOOSING_ROW
+                    }
+                    "0" -> TODO()
+                    else -> println("Invalid input")
+                }
+            }
+            CinemaManagerState.BUYING_TICKET_CHOOSING_ROW -> {
+                chosenRow = inputString.toInt()
+
+                println("Enter a seat number in that row:")
+                currentState = CinemaManagerState.BUYING_TICKET_CHOOSING_SEAT
+            }
+            CinemaManagerState.BUYING_TICKET_CHOOSING_SEAT -> {
+                chosenSeat = inputString.toInt()
+
+                currentRoom.bookSeat(chosenRow, chosenSeat)
+                chosenRow = 0
+                chosenSeat = 0
+
+                printMenu()
+                currentState = CinemaManagerState.CHOOSING_ACTION
+            }
+            CinemaManagerState.EDITING_ROOM_ROWS -> {
+                changeCurrentRoomRows(inputString.toInt())
+
+                currentState = CinemaManagerState.EDITING_ROOM_SEATS
+                println("Enter the number of seats in each row:")
+            }
+            CinemaManagerState.EDITING_ROOM_SEATS -> {
+                changeCurrentRoomSeatsInRow(inputString.toInt())
+
+                currentState = CinemaManagerState.CHOOSING_ACTION
+                printMenu()
+            }
         }
-        println("Total income:")
-        println("\$$expectedIncome")
+    }
+
+    private fun changeCurrentRoomRows(newRowsValue: Int) {
+        currentRoom.rows = newRowsValue
+    }
+
+    private fun changeCurrentRoomSeatsInRow(newSeatsValue: Int) {
+        currentRoom.columns = newSeatsValue
+    }
+
+    private fun printMenu() {
+        println()
+        println("""
+            1. Show the seats
+            2. Buy a ticket
+            0. Exit
+        """.trimIndent())
     }
 }
 
 fun main() {
     val cinemaManager = CinemaManager()
 
-    println("Enter the number of rows:")
-    val rows = readln().toInt()
-    println("Enter the number of seats in each row:")
-    val columns = readln().toInt()
-
-    cinemaManager.addCinemaRoom(rows, columns)
-    println()
-    cinemaManager.currentRoom.printGrid()
-    println()
-
-    println("Enter a row number:")
-    val x = readln().toInt()
-    println("Enter a seat number in that row:")
-    val y = readln().toInt()
-
-    println()
-    cinemaManager.currentRoom.bookSeat(x, y)
-    println()
-
-    cinemaManager.currentRoom.printGrid()
+    while (true) {
+        val userInput = readln()
+        if (userInput == "0") break
+        else cinemaManager.inputInterface(userInput)
+    }
 
 }
