@@ -4,29 +4,29 @@ class CinemaRoom(_rows: Int, _columns: Int) {
     var rows = if (_rows <= 9) _rows else 0
         set(value) {
             field = if (value <= 9) value else 0
-            makeGrid()
-            numberOfSeats = rows * columns
-            isALargeRoom = numberOfSeats > 60
+            updateFields()
         }
     var columns = if (_columns <= 9) _columns else 0
         set(value) {
             field = if (value <= 9) value else 0
-            makeGrid()
-            numberOfSeats = rows * columns
-            isALargeRoom = numberOfSeats > 60
+            updateFields()
         }
+
     private var grid = mutableListOf(mutableListOf<String>())
 
     private val defaultPrice = 10
     private val defaultBackPrice = 8
 
-    private var numberOfSeats: Int
-    private var isALargeRoom: Boolean
+    var numberOfSeats = 0
+    var numberOfSoldTickets = 0
+
+    var currentIncome = 0
+    var totalIncome = 0
+
+    private var isALargeRoom = false
 
     init {
-        makeGrid()
-        numberOfSeats = rows * columns
-        isALargeRoom = numberOfSeats > 60
+        updateFields()
     }
 
     private fun makeGrid() {
@@ -53,28 +53,57 @@ class CinemaRoom(_rows: Int, _columns: Int) {
         }
     }
 
-    fun bookSeat(row: Int, seat: Int) {
+    fun bookSeat(row: Int, seat: Int): Boolean {
         if (row <= rows && seat <= columns) {
             if (grid[row][seat] == "S") {
                 grid[row][seat] = "B"
+                numberOfSoldTickets += 1
 
                 val ticketPrice = if (isALargeRoom) {
                     if (row <= rows / 2) {
                         defaultPrice
                     } else defaultBackPrice
                 } else defaultPrice
+
+                currentIncome += ticketPrice
+
                 println("Ticket price: \$$ticketPrice")
+                return true
+            } else {
+                println()
+                println("That ticket has already been purchased!")
             }
+        } else {
+            println()
+            println("Wrong input!")
+        }
+        return false
+    }
+
+    private fun updateFields() {
+        makeGrid()
+        numberOfSeats = rows * columns
+        isALargeRoom = numberOfSeats > 60
+        calculateExpectedIncomeForRoom()
+    }
+
+    private fun calculateExpectedIncomeForRoom() {
+        totalIncome = if (numberOfSeats <= 60) {
+            numberOfSeats * defaultPrice
+        } else {
+            val firstHalfOfRoomIncome = rows / 2 * columns * defaultPrice
+            val secondHalfOfRoomIncome = (rows / 2 + rows % 2) * columns * defaultBackPrice
+            firstHalfOfRoomIncome + secondHalfOfRoomIncome
         }
     }
 }
 
 class CinemaManager {
     private val cinemaRooms: MutableList<CinemaRoom> = mutableListOf()
-    private var currentRoom: CinemaRoom
 
     private var currentState: CinemaManagerState
 
+    private var chosenRoom: CinemaRoom
     private var chosenRow = 0
     private var chosenSeat = 0
 
@@ -82,7 +111,7 @@ class CinemaManager {
         currentState = CinemaManagerState.EDITING_ROOM_ROWS
 
         cinemaRooms.add(CinemaRoom(0, 0))
-        currentRoom = if (cinemaRooms.isNotEmpty()) {
+        chosenRoom = if (cinemaRooms.isNotEmpty()) {
             cinemaRooms[0]
         } else CinemaRoom(0,0)
 
@@ -98,12 +127,16 @@ class CinemaManager {
             CinemaManagerState.CHOOSING_ACTION -> {
                 when(inputString.lowercase()) {
                     "1" -> {
-                        currentRoom.printGrid()
+                        chosenRoom.printGrid()
                         printMenu()
                     }
                     "2" -> {
                         println("\nEnter a row number:")
                         currentState = CinemaManagerState.BUYING_TICKET_CHOOSING_ROW
+                    }
+                    "3" -> {
+                        displayStatistic()
+                        printMenu()
                     }
                     "0" -> TODO()
                     else -> println("Invalid input")
@@ -118,12 +151,15 @@ class CinemaManager {
             CinemaManagerState.BUYING_TICKET_CHOOSING_SEAT -> {
                 chosenSeat = inputString.toInt()
 
-                currentRoom.bookSeat(chosenRow, chosenSeat)
+                currentState = if (chosenRoom.bookSeat(chosenRow, chosenSeat)) {
+                    printMenu()
+                    CinemaManagerState.CHOOSING_ACTION
+                } else {
+                    println("\nEnter a row number:")
+                    CinemaManagerState.BUYING_TICKET_CHOOSING_ROW
+                }
                 chosenRow = 0
                 chosenSeat = 0
-
-                printMenu()
-                currentState = CinemaManagerState.CHOOSING_ACTION
             }
             CinemaManagerState.EDITING_ROOM_ROWS -> {
                 changeCurrentRoomRows(inputString.toInt())
@@ -141,11 +177,11 @@ class CinemaManager {
     }
 
     private fun changeCurrentRoomRows(newRowsValue: Int) {
-        currentRoom.rows = newRowsValue
+        chosenRoom.rows = newRowsValue
     }
 
     private fun changeCurrentRoomSeatsInRow(newSeatsValue: Int) {
-        currentRoom.columns = newSeatsValue
+        chosenRoom.columns = newSeatsValue
     }
 
     private fun printMenu() {
@@ -153,7 +189,20 @@ class CinemaManager {
         println("""
             1. Show the seats
             2. Buy a ticket
+            3. Statistics
             0. Exit
+        """.trimIndent())
+    }
+
+    private fun displayStatistic() {
+        val percentage: Double = chosenRoom.numberOfSoldTickets.toDouble() / chosenRoom.numberOfSeats.toDouble() * 100
+        val formatPercentage = "%.2f".format(percentage).replace(',','.')
+        println()
+        println("""
+            Number of purchased tickets: ${chosenRoom.numberOfSoldTickets}
+            Percentage: $formatPercentage%
+            Current income: ${'$'}${chosenRoom.currentIncome}
+            Total income: ${'$'}${chosenRoom.totalIncome}
         """.trimIndent())
     }
 }
